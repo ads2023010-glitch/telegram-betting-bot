@@ -1,68 +1,75 @@
 import os
-from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
 import requests
 from bs4 import BeautifulSoup
+from telegram import Update
+from telegram.ext import Application, CommandHandler, ContextTypes
 
 TOKEN = os.getenv("TOKEN")
 
-async def scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Scan des matchs en cours...")
+
+def get_matches():
+
+    url = "https://megapari.com"
+
+    headers = {
+        "User-Agent": "Mozilla/5.0"
+    }
+
+    r = requests.get(url, headers=headers)
+
+    soup = BeautifulSoup(r.text, "html.parser")
+
+    matches = []
+
+    for m in soup.find_all("div"):
+
+        text = m.get_text(strip=True)
+
+        if "vs" in text.lower():
+            matches.append(text)
+
+        if len(matches) >= 5:
+            break
+
+    return matches
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Bot actif. Utilise /scan")
+
+    await update.message.reply_text(
+        "Bot actif.\nUtilise la commande /scan pour chercher des matchs."
+    )
+
+
+async def scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    await update.message.reply_text("Scan des matchs en cours...")
+
+    matches = get_matches()
+
+    if not matches:
+        await update.message.reply_text("Aucun match trouvé.")
+        return
+
+    message = "Matchs trouvés :\n\n"
+
+    for m in matches:
+        message += f"{m}\n"
+
+    await update.message.reply_text(message)
+
 
 def main():
+
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("scan", scan))
 
     print("Bot démarré")
+
     app.run_polling()
+
 
 if __name__ == "__main__":
     main()
-async def scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    cote1 = 2.0
-    cote2 = 1.65
-
-    mise1 = 7
-    mise2 = round((mise1 * cote1) / cote2, 2)
-
-    gain_si_1 = round(mise1 * cote1 - mise1 - mise2, 2)
-    gain_si_x2 = round(mise2 * cote2 - mise1 - mise2, 2)
-
-    message = f"""
-Match trouvé ⚽
-
-Cote 1 : {cote1}
-Cote X2 : {cote2}
-
-Mise 1 : {mise1}€
-Mise X2 : {mise2}€
-
-Gain si 1 gagne : {gain_si_1}€
-Gain si X2 gagne : {gain_si_x2}€
-"""
-
-    await update.message.reply_text(message)
-def get_matches():
-
-    url = "https://megapari.com"
-
-    r = requests.get(url, headers={
-        "User-Agent": "Mozilla/5.0"
-    })
-
-    soup = BeautifulSoup(r.text, "html.parser")
-
-    matches = []
-
-    for m in soup.find_all("div", class_="event"):
-
-        team = m.text
-        matches.append(team)
-
-    return matches[:5]
