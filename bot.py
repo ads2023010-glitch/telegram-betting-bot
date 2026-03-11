@@ -1,6 +1,8 @@
 import os
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
+import requests
+from bs4 import BeautifulSoup
 
 TOKEN = os.getenv("TOKEN")
 
@@ -46,3 +48,21 @@ Gain si X2 gagne : {gain_si_x2}€
 """
 
     await update.message.reply_text(message)
+def get_matches():
+
+    url = "https://megapari.com"
+
+    r = requests.get(url, headers={
+        "User-Agent": "Mozilla/5.0"
+    })
+
+    soup = BeautifulSoup(r.text, "html.parser")
+
+    matches = []
+
+    for m in soup.find_all("div", class_="event"):
+
+        team = m.text
+        matches.append(team)
+
+    return matches[:5]
