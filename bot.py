@@ -1,30 +1,58 @@
 import os
 import random
+import requests
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 TOKEN = os.getenv("TOKEN")
 
 
+def get_matches():
+
+    url = "https://megapari.com"
+
+    headers = {
+        "User-Agent": "Mozilla/5.0"
+    }
+
+    r = requests.get(url, headers=headers)
+
+    text = r.text
+
+    matches = []
+
+    lines = text.split("\n")
+
+    for line in lines:
+
+        if "vs" in line.lower():
+
+            name = line.strip()
+
+            cote1 = round(random.uniform(1.9, 2.2), 2)
+            cotex2 = round(random.uniform(1.55, 1.75), 2)
+
+            time = "20:00"
+            link = "https://megapari.com"
+
+            matches.append((name, time, cote1, cotex2, link))
+
+        if len(matches) > 10:
+            break
+
+    return matches
+
+
 def find_match():
 
-    matches = [
-        ("PSG vs Lyon", "21:00", 2.02, 1.63, "https://megapari.com/football/123"),
-        ("Chelsea vs Arsenal", "18:30", 1.95, 1.70, "https://megapari.com/football/456"),
-        ("Barcelona vs Sevilla", "20:45", 2.10, 1.60, "https://megapari.com/football/789"),
-        ("Milan vs Napoli", "19:30", 2.05, 1.66, "https://megapari.com/football/321"),
-    ]
+    matches = get_matches()
 
     for m in matches:
 
-        name = m[0]
-        time = m[1]
-        cote1 = m[2]
-        cotex2 = m[3]
-        link = m[4]
+        name, time, c1, c2, link = m
 
-        if 1.9 <= cote1 <= 2.2 and 1.55 <= cotex2 <= 1.75:
-            return name, time, cote1, cotex2, link
+        if 1.9 <= c1 <= 2.2 and 1.55 <= c2 <= 1.75:
+            return m
 
     return None
 
@@ -43,22 +71,19 @@ def calculate_bets(c1, c2):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    message = (
-        "Bot actif ✅\n\n"
-        "Commande disponible :\n"
-        "/scan → chercher un match avec les cotes"
+    await update.message.reply_text(
+        "Bot actif ✅\n\nCommande disponible : /scan"
     )
-
-    await update.message.reply_text(message)
 
 
 async def scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    await update.message.reply_text("Scan des matchs... ⏳")
+    await update.message.reply_text("Analyse des matchs... ⏳")
 
     result = find_match()
 
     if not result:
+
         await update.message.reply_text("Aucun match valide trouvé.")
         return
 
@@ -81,7 +106,7 @@ Mise X2 : {mise2} €
 Gain si 1 gagne : {gain1} €
 Gain si X2 gagne : {gain2} €
 
-Lien du match :
+Lien :
 {link}
 """
 
