@@ -9,7 +9,7 @@ TOKEN = os.getenv("TOKEN")
 
 def get_matches():
 
-    url = "https://megapari.com"
+    url = "https://mp267893.pro"
 
     headers = {
         "User-Agent": "Mozilla/5.0"
@@ -33,7 +33,7 @@ def get_matches():
             cotex2 = round(random.uniform(1.55, 1.75), 2)
 
             time = "20:00"
-            link = "https://megapari.com"
+            link = "https://mp267893.pro"
 
             matches.append((name, time, cote1, cotex2, link))
 
