@@ -1,14 +1,19 @@
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import os
+from telegram import Update
+from telegram.ext import Application, CommandHandler, ContextTypes
 
 TOKEN = os.getenv("TOKEN")
 
 async def scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Scan en cours...")
+    await update.message.reply_text("Scan des matchs en cours...")
 
-app = ApplicationBuilder().token(TOKEN).build()
+def main():
+    app = Application.builder().token(TOKEN).build()
 
-app.add_handler(CommandHandler("scan", scan))
+    app.add_handler(CommandHandler("scan", scan))
 
-app.run_polling()
+    print("Bot démarré...")
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
