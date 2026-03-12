@@ -18,23 +18,22 @@ def calculate_bets(c1, c2):
     return mise1, mise2, gain1, gain2
 
 # -----------------------------
-# Liste des championnats disponibles
+# Liste des championnats actifs
 # -----------------------------
 def list_championnats():
     url = f"https://api.the-odds-api.com/v4/sports/?apiKey={API_KEY}"
     try:
         r = requests.get(url, timeout=10)
         sports = r.json()
-        # retourne les clés et titres
         return {s['key']: s['title'] for s in sports if s['active']}
     except Exception as e:
-        print("Erreur lors de la récupération des sports:", e)
+        print("Erreur récupération sports:", e)
         return {}
 
 # -----------------------------
-# Récupère un match d’un championnat
+# Récupère un seul match d’un championnat
 # -----------------------------
-def get_one_match(championnat="soccer_epl"):
+def get_one_match(championnat):
     url = f"https://api.the-odds-api.com/v4/sports/{championnat}/odds/?apiKey={API_KEY}&regions=eu&markets=1x2&oddsFormat=decimal"
     try:
         r = requests.get(url, timeout=10)
@@ -48,7 +47,7 @@ def get_one_match(championnat="soccer_epl"):
                 c2 = next((o["price"] for o in odds if o["name"] == "Away"), None)
                 start_time = event.get("commence_time", "??:??")
                 link = sites[0].get("url", "")
-                return (teams, c1, c2, start_time, link)
+                return teams, c1, c2, start_time, link
         return None
     except Exception as e:
         print("Erreur JSON :", e)
@@ -58,12 +57,19 @@ def get_one_match(championnat="soccer_epl"):
 # Commande /scan
 # -----------------------------
 async def scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # liste les championnats pour debug
+    # Championnat passé en argument ou par défaut
     championnat_dispo = list_championnats()
-    # on prend le premier championnat actif par défaut
-    if championnat_dispo:
-        cle_championnat = list(championnat_dispo.keys())[0]
+    if context.args:
+        key = context.args[0]
+        if key not in championnat_dispo:
+            await update.message.reply_text(f"Championnat invalide !\nVoici les actifs : {', '.join(championnat_dispo.keys())}")
+            return
+        cle_championnat = key
     else:
+        # premier actif par défaut
+        cle_championnat = list(championnat_dispo.keys())[0] if championnat_dispo else None
+
+    if not cle_championnat:
         await update.message.reply_text("Aucun championnat actif trouvé.")
         return
 
@@ -97,5 +103,5 @@ Lien : {link}
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("scan", scan))
-    print("Bot démarré… envoie /scan pour recevoir un match")
+    print("Bot démarré… envoie /scan [championnat] pour recevoir un match")
     app.run_polling()
