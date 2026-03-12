@@ -15,17 +15,13 @@ def get_matches():
     url = "https://mp267893.pro/fatman-api/a6f69e4388362d761ee5bb073edb23ae3d9341fb/event.json"
 
     headers = {
-        "User-Agent": "Mozilla/5.0",
-        "Accept": "application/json",
-        "Origin": "https://megapari.com",
-        "Referer": "https://megapari.com/"
+        "User-Agent": "Mozilla/5.0"
     }
 
     r = requests.get(url, headers=headers)
 
-    data = r.json()
-
-    print(data)
+    print("STATUS:", r.status_code)
+    print("RESPONSE:", r.text[:500])
 
     return []
 
