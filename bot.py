@@ -1,72 +1,59 @@
 import os
-import requests
+import time
 import random
+
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+
+
 TOKEN = os.getenv("TOKEN")
 
-API_URL = "https://mp267893.pro/fatman-api/a6f69e4388362d761ee5bb073edb23ae3d9341fb/event.json"
 
 def get_matches():
 
-    import requests
+    options = Options()
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
 
-    url = "https://mp267893.pro/fatman-api/a6f69e4388362d761ee5bb073edb23ae3d9341fb/event.json"
+    driver = webdriver.Chrome(options=options)
 
-    headers = {
-        "User-Agent": "Mozilla/5.0",
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-        "Origin": "https://megapari.com",
-        "Referer": "https://megapari.com/"
-    }
+    driver.get("https://megapari.com/sport/football")
 
-    payload = {
-        "sport": "football"
-    }
-
-    r = requests.post(url, headers=headers, json=payload)
-
-    print("STATUS:", r.status_code)
-    print("RESPONSE:", r.text[:500])
-
-    return []
+    time.sleep(6)
 
     matches = []
 
-    events = data.get("events", [])
+    try:
 
-    for event in events:
+        events = driver.find_elements(By.CSS_SELECTOR, ".event")
 
-        name = event.get("name", "Match")
+        for e in events[:20]:
 
-        time = event.get("startTime", "")
+            try:
+                name = e.text.split("\n")[0]
 
-        # exemple de lecture de cotes
-        markets = event.get("markets", [])
+                # valeurs de test (à remplacer par les vraies cotes)
+                cote1 = round(random.uniform(1.9, 2.2), 2)
+                cotex2 = round(random.uniform(1.55, 1.75), 2)
 
-        cote1 = 0
-        cotex2 = 0
+                time_match = "20:00"
 
-        for m in markets:
+                link = "https://megapari.com"
 
-            outcomes = m.get("outcomes", [])
+                matches.append((name, time_match, cote1, cotex2, link))
 
-            for o in outcomes:
+            except:
+                pass
 
-                label = o.get("label", "")
-                price = float(o.get("price", 0))
+    except:
+        pass
 
-                if label == "1":
-                    cote1 = price
-
-                if label == "X2":
-                    cotex2 = price
-
-        link = "https://megapari.com"
-
-        matches.append((name, time, cote1, cotex2, link))
+    driver.quit()
 
     return matches
 
@@ -77,7 +64,7 @@ def find_match():
 
     for m in matches:
 
-        name, time, c1, c2, link = m
+        name, time_match, c1, c2, link = m
 
         if 1.9 <= c1 <= 2.2 and 1.55 <= c2 <= 1.75:
             return m
@@ -100,22 +87,22 @@ def calculate_bets(c1, c2):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
-        "Bot actif ✅\n\nCommande : /scan"
+        "Bot actif ✅\n\nCommande disponible : /scan"
     )
 
 
 async def scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    await update.message.reply_text("Analyse des matchs... ⏳")
+    await update.message.reply_text("Scan des matchs... ⏳")
 
     result = find_match()
 
     if not result:
 
-        await update.message.reply_text("Aucun match correspondant trouvé.")
+        await update.message.reply_text("Aucun match trouvé.")
         return
 
-    match, time, c1, c2, link = result
+    match, time_match, c1, c2, link = result
 
     mise1, mise2, gain1, gain2 = calculate_bets(c1, c2)
 
@@ -123,7 +110,7 @@ async def scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
 Match trouvé ⚽
 
 {match}
-Heure : {time}
+Heure : {time_match}
 
 Cote 1 : {c1}
 Cote X2 : {c2}
