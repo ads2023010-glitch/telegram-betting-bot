@@ -1,59 +1,44 @@
 import os
-import time
+import requests
 import random
-
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-
-
 TOKEN = os.getenv("TOKEN")
+
+API_URL = "https://4689732mp.pro/service-api/LiveFeed/Get1x2_VZip?count=200&lng=fr&gr=824&mode=4&country=6&partner=192&virtualSports=true&countryFirst=true&noFilterBlockEvent=true"
 
 
 def get_matches():
 
-    options = Options()
-    options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
+    r = requests.get(API_URL)
 
-    driver = webdriver.Chrome(options=options)
-
-    driver.get("https://megapari.com/sport/football")
-
-    time.sleep(6)
+    data = r.json()
 
     matches = []
 
-    try:
+    for league in data.get("Value", []):
 
-        events = driver.find_elements(By.CSS_SELECTOR, ".event")
-
-        for e in events[:20]:
+        for match in league.get("E", []):
 
             try:
-                name = e.text.split("\n")[0]
 
-                # valeurs de test (à remplacer par les vraies cotes)
-                cote1 = round(random.uniform(1.9, 2.2), 2)
-                cotex2 = round(random.uniform(1.55, 1.75), 2)
+                team1 = match["O1"]
+                team2 = match["O2"]
 
-                time_match = "20:00"
+                name = f"{team1} vs {team2}"
+
+                cote1 = float(match["C"][0][0])
+                cote2 = float(match["C"][0][2])
+
+                time_match = match["S"]
 
                 link = "https://megapari.com"
 
-                matches.append((name, time_match, cote1, cotex2, link))
+                matches.append((name, time_match, cote1, cote2, link))
 
             except:
                 pass
-
-    except:
-        pass
-
-    driver.quit()
 
     return matches
 
@@ -67,6 +52,7 @@ def find_match():
         name, time_match, c1, c2, link = m
 
         if 1.9 <= c1 <= 2.2 and 1.55 <= c2 <= 1.75:
+
             return m
 
     return None
@@ -93,13 +79,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    await update.message.reply_text("Scan des matchs... ⏳")
+    await update.message.reply_text("Analyse des matchs... ⏳")
 
     result = find_match()
 
     if not result:
 
-        await update.message.reply_text("Aucun match trouvé.")
+        await update.message.reply_text("Aucun match correspondant trouvé.")
         return
 
     match, time_match, c1, c2, link = result
