@@ -6,9 +6,9 @@ import requests
 # Variables d'environnement sur Railway
 TOKEN = os.getenv("TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
+API_KEY = os.getenv("ODDSAPI_KEY")  # Clé TheOddsAPI
 
 def send_message(text):
-    """Envoie un message sur Telegram"""
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     data = {"chat_id": CHAT_ID, "text": text}
     try:
@@ -17,7 +17,6 @@ def send_message(text):
         print("Erreur Telegram :", e)
 
 def calculate_bets(c1, c2):
-    """Calcule les mises pour un gain ±2€"""
     mise1 = round(random.uniform(5, 10), 2)
     mise2 = round((mise1 * c1) / c2, 2) if c2 != 0 else 0
     gain1 = round(mise1 * c1 - mise1 - mise2, 2)
@@ -25,29 +24,26 @@ def calculate_bets(c1, c2):
     return mise1, mise2, gain1, gain2
 
 def get_live_matches():
-    """Récupère tous les matchs depuis le JSON Megapari"""
-    url = "https://4689732mp.pro/service-api/LiveFeed/Get1x2_VZip?count=20&lng=fr&gr=824&mode=4&country=6&partner=192&virtualSports=true&countryFirst=true&noFilterBlockEvent=true"
+    url = f"https://api.the-odds-api.com/v4/sports/soccer_epl/odds/?apiKey={API_KEY}&regions=eu&markets=1x2&oddsFormat=decimal"
     try:
         r = requests.get(url, timeout=10)
         data = r.json()
         matches = []
-
-        for event in data.get("Value", []):
-            for e in event.get("E", []):
-                # Nom des équipes
-                teams = f"{e.get('O1','Equipe1')} vs {e.get('O2','Equipe2')}"
-                # Récupère les cotes (1 et X2)
-                if "C" in e and len(e["C"]) >= 1:
-                    cotes = e["C"][0]
-                    if len(cotes) >= 2:
-                        c1 = float(cotes[0])
-                        c2 = float(cotes[2]) if len(cotes) > 2 else float(cotes[1])
-                        start_time = e.get("S", "??:??")
-                        link = f"https://megapari.com/fr/live/football"
-                        matches.append((teams, c1, c2, start_time, link))
+        for event in data:
+            teams = f"{event['home_team']} vs {event['away_team']}"
+            sites = event.get("bookmakers", [])
+            if sites:
+                # On prend le premier bookmaker
+                odds = sites[0]["markets"][0]["outcomes"]
+                c1 = next((o["price"] for o in odds if o["name"] == "Home"), None)
+                c2 = next((o["price"] for o in odds if o["name"] == "Draw"), None)
+                c3 = next((o["price"] for o in odds if o["name"] == "Away"), None)
+                start_time = event.get("commence_time", "??:??")
+                link = sites[0].get("url", "")
+                matches.append((teams, c1, c3, start_time, link))  # 1 et 2/away pour X2
         return matches
     except Exception as e:
-        print("Erreur récupération JSON :", e)
+        print("Erreur JSON :", e)
         return []
 
 def main():
@@ -78,9 +74,8 @@ Lien : {link}
 """
                 send_message(message)
         else:
-            send_message("Aucun match trouvé pour l'instant.")  # permet de tester
             print("Aucun match pour l'instant.")
-        time.sleep(30)
+        time.sleep(60)  # vérifie toutes les 60s
 
 if __name__ == "__main__":
     main()
