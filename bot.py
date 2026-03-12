@@ -2,19 +2,19 @@ import os
 import time
 import random
 import requests
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 
-# Telegram
-TOKEN = os.getenv("TOKEN")       # défini dans Railway comme variable d'environnement
-CHAT_ID = os.getenv("CHAT_ID")   # défini dans Railway
+# Variables d'environnement sur Railway
+TOKEN = os.getenv("TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
 
 def send_message(text):
+    """Envoie un message sur Telegram"""
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     data = {"chat_id": CHAT_ID, "text": text}
     requests.post(url, data=data)
 
 def calculate_bets(c1, c2):
+    """Calcule les mises pour un gain ±2€"""
     mise1 = round(random.uniform(5, 10), 2)
     mise2 = round((mise1 * c1) / c2, 2)
     gain1 = round(mise1 * c1 - mise1 - mise2, 2)
@@ -22,36 +22,37 @@ def calculate_bets(c1, c2):
     return mise1, mise2, gain1, gain2
 
 def get_live_matches():
-    options = Options()
-    options.headless = True
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    driver = webdriver.Chrome(options=options)
-
-    driver.get("https://www.megapari.com/fr/live/football")
-    time.sleep(5)  # laisser le site se charger
-
-    matches = []
+    """Récupère les matchs depuis le JSON Megapari"""
+    url = "https://4689732mp.pro/service-api/LiveFeed/Get1x2_VZip?count=20&lng=fr&gr=824&mode=4&country=6&partner=192&virtualSports=true&countryFirst=true&noFilterBlockEvent=true"
     try:
-        match_elements = driver.find_elements_by_css_selector(".event-row")  # à adapter selon le site
-        for m in match_elements:
-            teams = m.find_element_by_css_selector(".event-name").text
-            odds_elements = m.find_elements_by_css_selector(".price-cell")
-            if len(odds_elements) >= 2:
-                c1 = float(odds_elements[0].text.replace(",", "."))
-                c2 = float(odds_elements[1].text.replace(",", "."))
-                matches.append((teams, c1, c2))
+        r = requests.get(url, timeout=10)
+        data = r.json()
+        matches = []
+
+        for event in data.get("Value", []):
+            for e in event.get("E", []):
+                # Récupère le nom des équipes
+                teams = f"{e.get('O1')} vs {e.get('O2')}"
+                # Récupère les cotes (1 et X2)
+                if "C" in e and len(e["C"]) >= 1:
+                    cotes = e["C"][0]
+                    if len(cotes) >= 2:
+                        c1 = float(cotes[0])
+                        c2 = float(cotes[2])  # X2
+                        start_time = e.get("S", "??:??")
+                        link = f"https://megapari.com/fr/live/football"  # Lien générique
+                        matches.append((teams, c1, c2, start_time, link))
+        return matches
     except Exception as e:
-        print("Erreur Selenium :", e)
-    driver.quit()
-    return matches
+        print("Erreur récupération JSON :", e)
+        return []
 
 def main():
     sent_matches = set()
     while True:
         matches = get_live_matches()
         if matches:
-            for match, c1, c2 in matches:
+            for match, c1, c2, start_time, link in matches:
                 if match in sent_matches:
                     continue
                 sent_matches.add(match)
@@ -59,6 +60,7 @@ def main():
                 message = f"""
 Match trouvé ⚽
 {match}
+Début : {start_time}
 
 Cote 1 : {c1}
 Cote X2 : {c2}
@@ -69,13 +71,12 @@ Mise X2 : {mise2} €
 Gain si 1 gagne : {gain1} €
 Gain si X2 gagne : {gain2} €
 
-Lien : https://megapari.com/fr/live/football
+Lien : {link}
 """
                 send_message(message)
         else:
             print("Aucun match pour l'instant.")
-        time.sleep(30)  # scan toutes les 30s
+        time.sleep(30)
 
 if __name__ == "__main__":
     main()
-
