@@ -1,107 +1,48 @@
 import os
-import random
 import requests
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, ContextTypes
 
-TOKEN = os.getenv("TOKEN")
 API_KEY = os.getenv("ODDSAPI_KEY")
+ODDS_URL = f"https://api.the-odds-api.com/v4/sports/upcoming/odds/?regions=eu&markets=h2h&apiKey={API_KEY}"
 
-# -----------------------------
-# Calcul des mises et gains
-# -----------------------------
-def calculate_bets(c1, c2):
-    mise1 = round(random.uniform(5, 10), 2)
-    mise2 = round((mise1 * c1) / c2, 2) if c2 else 0
-    gain1 = round(mise1 * c1 - mise1 - mise2, 2)
-    gain2 = round(mise2 * c2 - mise1 - mise2, 2)
-    return mise1, mise2, gain1, gain2
-
-# -----------------------------
-# Liste des championnats actifs
-# -----------------------------
-def list_championnats():
-    url = f"https://api.the-odds-api.com/v4/sports/?apiKey={API_KEY}"
-    try:
-        r = requests.get(url, timeout=10)
-        sports = r.json()
-        return {s['key']: s['title'] for s in sports if s['active']}
-    except Exception as e:
-        print("Erreur récupération sports:", e)
-        return {}
-
-# -----------------------------
-# Récupère un seul match d’un championnat
-# -----------------------------
-def get_one_match(championnat):
-    url = f"https://api.the-odds-api.com/v4/sports/{championnat}/odds/?apiKey={API_KEY}&regions=eu&markets=1x2&oddsFormat=decimal"
-    try:
-        r = requests.get(url, timeout=10)
-        data = r.json()
-        for event in data:
-            teams = f"{event['home_team']} vs {event['away_team']}"
-            sites = event.get("bookmakers", [])
-            if sites:
-                odds = sites[0]["markets"][0]["outcomes"]
-                c1 = next((o["price"] for o in odds if o["name"] == "Home"), None)
-                c2 = next((o["price"] for o in odds if o["name"] == "Away"), None)
-                start_time = event.get("commence_time", "??:??")
-                link = sites[0].get("url", "")
-                return teams, c1, c2, start_time, link
-        return None
-    except Exception as e:
-        print("Erreur JSON :", e)
-        return None
-
-# -----------------------------
-# Commande /scan
-# -----------------------------
 async def scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Championnat passé en argument ou par défaut
-    championnat_dispo = list_championnats()
-    if context.args:
-        key = context.args[0]
-        if key not in championnat_dispo:
-            await update.message.reply_text(f"Championnat invalide !\nVoici les actifs : {', '.join(championnat_dispo.keys())}")
+    try:
+        r = requests.get(ODDS_URL)
+        matches = r.json()
+        if not matches:
+            await update.message.reply_text("Aucun match trouvé pour le moment.")
             return
-        cle_championnat = key
-    else:
-        # premier actif par défaut
-        cle_championnat = list(championnat_dispo.keys())[0] if championnat_dispo else None
 
-    if not cle_championnat:
-        await update.message.reply_text("Aucun championnat actif trouvé.")
-        return
+        # Prendre seulement le premier match
+        match = matches[0]
+        home = match['home_team']
+        away = match['away_team']
+        time = match['commence_time']
 
-    match = get_one_match(cle_championnat)
-    if match:
-        teams, c1, c2, start_time, link = match
-        mise1, mise2, gain1, gain2 = calculate_bets(c1, c2)
-        message = f"""
-Match trouvé ⚽
-{teams}
-Début : {start_time}
+        # Récupérer la première cote disponible pour chaque équipe
+        bookmaker = match['bookmakers'][0]
+        outcomes = bookmaker['markets'][0]['outcomes']
+        home_price = outcomes[0]['price']
+        away_price = outcomes[1]['price']
 
-Cote 1 : {c1}
-Cote 2 : {c2}
+        # Calcul de mise pour ~2€ de gain
+        stake_home = round(2 / home_price, 2)
+        stake_away = round(2 / away_price, 2)
 
-Mise 1 : {mise1} €
-Mise 2 : {mise2} €
+        msg = f"🏀 Match : {home} vs {away}\n"
+        msg += f"⏰ Heure : {time}\n"
+        msg += f"💰 Cotes ({bookmaker['title']}): {home}={home_price}, {away}={away_price}\n"
+        msg += f"💵 Mise approximative pour ~2€ de gain : {home}={stake_home}€, {away}={stake_away}€\n"
 
-Gain si 1 gagne : {gain1} €
-Gain si 2 gagne : {gain2} €
+        await update.message.reply_text(msg)
 
-Lien : {link}
-"""
-    else:
-        message = "Aucun match trouvé pour l'instant."
-    await update.message.reply_text(message)
+    except Exception as e:
+        await update.message.reply_text(f"Erreur lors du scan : {e}")
 
-# -----------------------------
-# Lancement du bot
-# -----------------------------
-if __name__ == "__main__":
-    app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(CommandHandler("scan", scan))
-    print("Bot démarré… envoie /scan [championnat] pour recevoir un match")
-    app.run_polling()
+# Création du bot
+TOKEN = os.getenv("TELEGRAM_TOKEN")
+app = Application.builder().token(TOKEN).build()
+app.add_handler(CommandHandler("scan", scan))
+
+app.run_polling()
