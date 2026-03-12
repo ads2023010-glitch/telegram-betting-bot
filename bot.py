@@ -1,44 +1,47 @@
 import os
-import random
 import requests
+import random
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 TOKEN = os.getenv("TOKEN")
 
+API_URL = "https://mp267893.pro/fatman-api/a6f69e4388362d761ee5bb073edb23ae3d9341fb/event.json"
+
 
 def get_matches():
 
-    url = "https://mp267893.pro"
-
     headers = {
-        "User-Agent": "Mozilla/5.0"
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "application/json"
     }
 
-    r = requests.get(url, headers=headers)
-
-    text = r.text
+    try:
+        r = requests.get(API_URL, headers=headers, timeout=10)
+        data = r.json()
+    except:
+        return []
 
     matches = []
 
-    lines = text.split("\n")
+    events = data.get("events", [])
 
-    for line in lines:
+    for event in events:
 
-        if "vs" in line.lower():
+        team1 = event.get("team1", "")
+        team2 = event.get("team2", "")
 
-            name = line.strip()
+        name = f"{team1} vs {team2}"
 
-            cote1 = round(random.uniform(1.9, 2.2), 2)
-            cotex2 = round(random.uniform(1.55, 1.75), 2)
+        time = event.get("startTime", "??")
 
-            time = "20:00"
-            link = "https://mp267893.pro"
+        # ces clés peuvent varier selon l'API
+        cote1 = event.get("odd1", 0)
+        cotex2 = event.get("oddX2", 0)
 
-            matches.append((name, time, cote1, cotex2, link))
+        link = "https://megapari.com"
 
-        if len(matches) > 10:
-            break
+        matches.append((name, time, cote1, cotex2, link))
 
     return matches
 
@@ -51,7 +54,7 @@ def find_match():
 
         name, time, c1, c2, link = m
 
-        if 1.9 <= c1 <= 2.2 and 1.55 <= c2 <= 1.75:
+        if 1.9 <= float(c1) <= 2.2 and 1.55 <= float(c2) <= 1.75:
             return m
 
     return None
@@ -78,18 +81,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    await update.message.reply_text("Analyse des matchs... ⏳")
+    await update.message.reply_text("Scan des matchs... ⏳")
 
     result = find_match()
 
     if not result:
-
-        await update.message.reply_text("Aucun match valide trouvé.")
+        await update.message.reply_text("Aucun match correspondant trouvé.")
         return
 
     match, time, c1, c2, link = result
 
-    mise1, mise2, gain1, gain2 = calculate_bets(c1, c2)
+    mise1, mise2, gain1, gain2 = calculate_bets(float(c1), float(c2))
 
     message = f"""
 Match trouvé ⚽
