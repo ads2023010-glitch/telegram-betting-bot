@@ -15,10 +15,18 @@ def get_matches():
     url = "https://mp267893.pro/fatman-api/a6f69e4388362d761ee5bb073edb23ae3d9341fb/event.json"
 
     headers = {
-        "User-Agent": "Mozilla/5.0"
+        "User-Agent": "Mozilla/5.0",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Origin": "https://megapari.com",
+        "Referer": "https://megapari.com/"
     }
 
-    r = requests.get(url, headers=headers)
+    payload = {
+        "sport": "football"
+    }
+
+    r = requests.post(url, headers=headers, json=payload)
 
     print("STATUS:", r.status_code)
     print("RESPONSE:", r.text[:500])
