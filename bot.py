@@ -5,9 +5,11 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 TOKEN = os.getenv("TOKEN")
-CHAT_ID = os.getenv("CHAT_ID")
-API_KEY = os.getenv("ODDSAPI_KEY")  # TheOddsAPI
+API_KEY = os.getenv("ODDSAPI_KEY")
 
+# -----------------------------
+# Calcul des mises et gains
+# -----------------------------
 def calculate_bets(c1, c2):
     mise1 = round(random.uniform(5, 10), 2)
     mise2 = round((mise1 * c1) / c2, 2) if c2 else 0
@@ -15,8 +17,25 @@ def calculate_bets(c1, c2):
     gain2 = round(mise2 * c2 - mise1 - mise2, 2)
     return mise1, mise2, gain1, gain2
 
-def get_one_match():
-    url = f"https://api.the-odds-api.com/v4/sports/soccer_epl/odds/?apiKey={API_KEY}&regions=eu&markets=1x2&oddsFormat=decimal"
+# -----------------------------
+# Liste des championnats disponibles
+# -----------------------------
+def list_championnats():
+    url = f"https://api.the-odds-api.com/v4/sports/?apiKey={API_KEY}"
+    try:
+        r = requests.get(url, timeout=10)
+        sports = r.json()
+        # retourne les clés et titres
+        return {s['key']: s['title'] for s in sports if s['active']}
+    except Exception as e:
+        print("Erreur lors de la récupération des sports:", e)
+        return {}
+
+# -----------------------------
+# Récupère un match d’un championnat
+# -----------------------------
+def get_one_match(championnat="soccer_epl"):
+    url = f"https://api.the-odds-api.com/v4/sports/{championnat}/odds/?apiKey={API_KEY}&regions=eu&markets=1x2&oddsFormat=decimal"
     try:
         r = requests.get(url, timeout=10)
         data = r.json()
@@ -35,8 +54,20 @@ def get_one_match():
         print("Erreur JSON :", e)
         return None
 
+# -----------------------------
+# Commande /scan
+# -----------------------------
 async def scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    match = get_one_match()
+    # liste les championnats pour debug
+    championnat_dispo = list_championnats()
+    # on prend le premier championnat actif par défaut
+    if championnat_dispo:
+        cle_championnat = list(championnat_dispo.keys())[0]
+    else:
+        await update.message.reply_text("Aucun championnat actif trouvé.")
+        return
+
+    match = get_one_match(cle_championnat)
     if match:
         teams, c1, c2, start_time, link = match
         mise1, mise2, gain1, gain2 = calculate_bets(c1, c2)
@@ -60,6 +91,9 @@ Lien : {link}
         message = "Aucun match trouvé pour l'instant."
     await update.message.reply_text(message)
 
+# -----------------------------
+# Lancement du bot
+# -----------------------------
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("scan", scan))
