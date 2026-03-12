@@ -8,8 +8,11 @@ TOKEN = os.getenv("TOKEN")
 
 API_URL = "https://mp267893.pro/fatman-api/a6f69e4388362d761ee5bb073edb23ae3d9341fb/event.json"
 
-
 def get_matches():
+
+    import requests
+
+    url = "https://mp267893.pro/fatman-api/a6f69e4388362d761ee5bb073edb23ae3d9341fb/event.json"
 
     headers = {
         "User-Agent": "Mozilla/5.0",
@@ -18,11 +21,13 @@ def get_matches():
         "Referer": "https://megapari.com/"
     }
 
-    try:
-        r = requests.get(API_URL, headers=headers, timeout=10)
-        data = r.json()
-    except:
-        return []
+    r = requests.get(url, headers=headers)
+
+    data = r.json()
+
+    print(data)
+
+    return []
 
     matches = []
 
