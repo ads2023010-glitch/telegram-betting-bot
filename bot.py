@@ -13,7 +13,9 @@ def get_matches():
 
     headers = {
         "User-Agent": "Mozilla/5.0",
-        "Accept": "application/json"
+        "Accept": "application/json",
+        "Origin": "https://megapari.com",
+        "Referer": "https://megapari.com/"
     }
 
     try:
@@ -28,16 +30,30 @@ def get_matches():
 
     for event in events:
 
-        team1 = event.get("team1", "")
-        team2 = event.get("team2", "")
+        name = event.get("name", "Match")
 
-        name = f"{team1} vs {team2}"
+        time = event.get("startTime", "")
 
-        time = event.get("startTime", "??")
+        # exemple de lecture de cotes
+        markets = event.get("markets", [])
 
-        # ces clés peuvent varier selon l'API
-        cote1 = event.get("odd1", 0)
-        cotex2 = event.get("oddX2", 0)
+        cote1 = 0
+        cotex2 = 0
+
+        for m in markets:
+
+            outcomes = m.get("outcomes", [])
+
+            for o in outcomes:
+
+                label = o.get("label", "")
+                price = float(o.get("price", 0))
+
+                if label == "1":
+                    cote1 = price
+
+                if label == "X2":
+                    cotex2 = price
 
         link = "https://megapari.com"
 
@@ -54,7 +70,7 @@ def find_match():
 
         name, time, c1, c2, link = m
 
-        if 1.9 <= float(c1) <= 2.2 and 1.55 <= float(c2) <= 1.75:
+        if 1.9 <= c1 <= 2.2 and 1.55 <= c2 <= 1.75:
             return m
 
     return None
@@ -75,23 +91,24 @@ def calculate_bets(c1, c2):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
-        "Bot actif ✅\n\nCommande disponible : /scan"
+        "Bot actif ✅\n\nCommande : /scan"
     )
 
 
 async def scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    await update.message.reply_text("Scan des matchs... ⏳")
+    await update.message.reply_text("Analyse des matchs... ⏳")
 
     result = find_match()
 
     if not result:
+
         await update.message.reply_text("Aucun match correspondant trouvé.")
         return
 
     match, time, c1, c2, link = result
 
-    mise1, mise2, gain1, gain2 = calculate_bets(float(c1), float(c2))
+    mise1, mise2, gain1, gain2 = calculate_bets(c1, c2)
 
     message = f"""
 Match trouvé ⚽
